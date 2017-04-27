@@ -1,16 +1,101 @@
 #include "parser.h"
 #include <string.h>
 
-struct parser* parser_create(char* prototype, char* file){
-    FILE* src = fopen()
+void parse_statement(struct element* scope, struct parser* parser);
+void parse_element_declaration(struct element* scope, struct parser* parser);
+void parse_field_assignment(struct element* scope, struct parser* parser);
+void prototype_parse_element(struct parser* parser, struct element* prototype);
+void prototype_parse_field(struct parser* parser, struct element* prototype);
+void prototype_parse_statement(struct parser* parser, struct element* prototype);
+
+#define LEXER_NEXT lexer_next(parser->lexer)
+#define LEXER_NEXT_ENFORCE(type) lexer_next(parser->lexer); if (token.type != type) LEXER_ERROR("Failed to enforce token\n")
+#define LEXER_ERROR(err) lexer_error(lexer, err)
+
+void prototype_parse_element(struct parser* parser, struct element* prototype){
+
+    struct element* element = malloc(sizeof(struct element));
+    // get the key
+    struct token token = LEXER_NEXT;
+    element->key = token.identifier;
+
+    // handle the opening brace
+    LEXER_NEXT_ENFORCE(TKN_OPEN_BRACE);
+    // move the scope to our new element and continue parsing
+    prototype_parse_statement(parser, element);
+}
+
+void prototype_parse_field(struct parser* parser, struct element* prototype){
+    struct field* field = malloc(sizeof(struct element));
+    // get the key
+    struct token token = LEXER_NEXT;
+    field->key = token->value->identifier;
+
+    LEXER_NEXT_ENFORCE(TKN_COLON);
+
+    LEXER_NEXT
+    switch(LEXER_TOKEN_TYPE){
+        case TKN_IDENTIFIER:
+            field->value->identifer = LEXER_TOKEN_VALUE
+            switch(LEXER_PEEK){
+                case TKN_OPEN_BRACKET:
+                    LEXER_NEXT;
+                    break;
+                default
+            }
+            break;
+        case OPEN_BRACKET:
+
+            break;
+    }
+    field->value->identifier =
+}
+
+void prototype_parse_statement(struct parser* parser, struct element* prototype){
+    if (LEXER_PEEK == TKN_CLOSE_BRACE){
+        LEXER_NEXT;
+        parse_statement(lexer, prototype->parent);
+    }
+    switch(LEXER_DOUBLE_PEEK){
+        case TKN_OPEN_BRACE:
+            prototype_parse_element(lexer, prototype);
+            break;
+        case TKN_OPEN_BRACE:
+            prototype_parse_field(lexer, prototype);
+            break;
+        default:
+            return;
+    }
+}
+
+void prototype_create(struct parser* parser){
+    parser->prototype = malloc(sizeof(struct element));
+    prototype_parse_statement(parser, parser->prototype);
+}
+
+void free_element(struct element* element){
+    for (int i = 0; i < element->num_fields; i++){
+        free(element->fields[i]);
+    }
+    for (int i = 0; i < element->num_elements; i++){
+        free_element(element->elements[i]);
+    }
+    free(element);
+}
+
+
+void prototype_free(struct element* prototype){
+    free_element(prototype);
+}
+
+struct parser* parser_create(char* prototype_file){
+    FILE* p = fopen(prototype_file, "r");
+
     struct parser* p = malloc(sizeof(struct parser));
     struct lexer* l = lexer_create(src, len);
     p->offset = 0;
     p->lexer = l;
-    size_t num_tokens;
-    p->tokens = lexer_tokenize(l, &num_tokens);
-    p->num_tokens = num_tokens;
-    printf("Lexer found %u tokens!\n", p->num_tokens);
+    prototype_create(parser);
     return p;
 }
 
@@ -49,7 +134,7 @@ void parse_field_assignment(struct element* prototype, struct element* scope, st
 
 void parse_element_declaration(struct element* prototype, struct element* scope, struct parser* parser){
 
-    struct token token = NEXT_TOKEN;
+    struct token token = LEXER_NEXT;
 
     // process {
     parser->offset++;
@@ -105,6 +190,7 @@ struct element* parser_run(struct parser* parser){
     scope = element_element(scope, "fireVM");
     return scope;
 }
+
 
 void parser_free(struct parser* parser){
     free(parser);

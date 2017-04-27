@@ -1,9 +1,5 @@
 #include "ast.h"
 
-int is_power_of_two (unsigned int x){
-  return ((x != 0) && ((x & (~x + 1)) == x));
-}
-
 void add_element(struct element* scope, struct element* element){
     if (scope->num_elements == 0){
         scope->elements = calloc(1, sizeof(struct element*));
@@ -34,7 +30,7 @@ struct element* create_element(struct element* parent, char* key){
     return element;
 }
 
-void create_field(struct element* parent, char* key, union field_value value, enum token_type t){
+void create_field(struct element* parent, char* key, enum token_type t, union field_value* value){
     struct field* field = malloc(sizeof(struct field));
     field->key = key;
     field->value = value;

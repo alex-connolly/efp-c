@@ -2,7 +2,7 @@ A tool for generating Element-Field Parsers.
 
 ```go
 fireVM {
-    imports {
+    imports! {
         instructions : id!
         fuel : id!
     }
@@ -11,11 +11,14 @@ fireVM {
         arguments : int(0)
         push : int(0)
         pop : int(0)
-        fuel : (id || int)(0)
+        fuel : (id|int)(0)
         fuel() : id
         execute() : id!
     }
-    name : string!
-    author : [string]!
+    $ {
+        name : string!
+    }
+    name : string("Default FireVM")
+    author : [string]
 }
 ```

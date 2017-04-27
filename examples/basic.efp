@@ -1,0 +1,14 @@
+animal {
+    cat {
+        name : string
+        lives : int(9)
+        nicknames : [string]
+    }
+    dog {
+        name : string
+        dob : string
+        nicknames : [string:2] // max length is two
+        place : [2:string] // min length is two
+        happenings : [2:string:2] // only length is two
+    }
+}

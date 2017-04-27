@@ -5,20 +5,37 @@
 #define LINE_ADD(n) lexer->line += n; RESET_COL
 #define RESET_COL lexer->column = 0
 #define IS_EOF (lexer->offset >= lexer->length)
-#define OFFSET_ADD(n) ++lexer->offset; INC_COL
+#define OFFSET_ADD(n) lexer->offset += n;
 #define INC_OFFSET_POSITION(n) OFFSET_ADD(n); POS_ADD(n)
 #define PEEK(n) ((lexer->offset < lexer->length + 1) ? lexer->buffer[lexer->offset+n] : 0)
-#define NEXT(n) lexer->buffer[lexer->offset+=n]; POS_ADD(); COL_ADD(n);
+#define NEXT(n) lexer->buffer[lexer->offset+=n]; POS_ADD(n); COL_ADD(n);
 
 // TKN macros
 #define TKN_RESET				lexer->token = NO_TOKEN; lexer->token.position = lexer->position; \
-								lexer->token.line = lexer->line; lexer->token.col = lexer->col
+								lexer->token.line = lexer->line; lexer->token.column = lexer->column
 #define SET_TKNESCAPED(value)	lexer->token.escaped = value
 #define SET_TKNTYPE(t)			lexer->token.type = t
 
 static inline bool is_newline(struct lexer* lexer, int c){
     // many more cases
     return (c == '\n');
+}
+
+int token_int(struct lexer* lexer, struct token token){
+	// get as string first --> probably a much better way
+	char* value = malloc((token.end - token.start + 1)*(sizeof(char)));
+    strncpy(value, lexer->buffer + token.start, token.end - token.start);
+    value[token.end - token.start] = '\0';
+	int x = atoi(value);
+	free(value);
+	return x;
+}
+
+char* token_string(struct lexer* lexer, struct token token){
+	char* value = malloc((token.end - token.start + 1)*(sizeof(char)));
+    strncpy(value, lexer->buffer + token.start, token.end - token.start);
+    value[token.end - token.start] = '\0';
+	return value;
 }
 
 static inline bool is_identifier (int c) {
@@ -59,7 +76,6 @@ struct lexer* lexer_create(const char* src, size_t len){
 	lexer->column = 0;
 	lexer->position = 0;
 	lexer->length = len;
-	lexer->peeking = false;
     return lexer;
 }
 
@@ -69,7 +85,7 @@ void lexer_free(struct lexer* lexer){
 
 static inline int next_utf8(struct lexer* lexer) {
 	printf("next utf8\n");
-    int c = NEXT;
+    int c = NEXT(1);
 	lexer->token.end++;
     uint32_t len = utf8_charbytes((const char *)&c, 0);
     if (len == 1) {
@@ -77,9 +93,9 @@ static inline int next_utf8(struct lexer* lexer) {
     }
     switch(len) {
         case 0: lexer_error(lexer, "Unknown character inside a string literal"); return 0;
-        case 2: OFFSET_ADD(1) break;
-    	case 3: OFFSET_ADD(2); break;
-        case 4: OFFSET_ADD(3); POS_ADD(1);  break;
+        case 2: OFFSET_ADD(1) COL_ADD(1); break;
+    	case 3: OFFSET_ADD(2); COL_ADD(1); break;
+        case 4: OFFSET_ADD(3); COL_ADD(1); POS_ADD(1);  break;
     }
     return c;
 }
@@ -97,9 +113,9 @@ void lexer_scan_string(struct lexer* lexer) {
     TKN_RESET;				// save offset
     SET_TKNESCAPED(false);		// set escaped flag to false
 
-    while ((c2 = (unsigned char)PEEK_CURRENT) != c) {
+    while ((c2 = (unsigned char)PEEK(0)) != c) {
         if (IS_EOF) {lexer_error(lexer, "Unexpected EOF inside a string literal");}
-        if (is_newline(lexer, c2)) INC_LINE;
+        if (is_newline(lexer, c2)) LINE_ADD(1);
 
         // handle escaped characters
         if (c2 == '\\') {
@@ -113,7 +129,7 @@ void lexer_scan_string(struct lexer* lexer) {
     }
 
     // skip last escape character
-    INC_OFFSET_POSITION;
+    ADD_OFFSET_POSITION(1);
 
 	printf("string with start %d and end %d\n", lexer->token.start, lexer->token.end);
     // string is from buffer->[nseek] and it is nlen length
@@ -124,44 +140,29 @@ void lexer_scan_string(struct lexer* lexer) {
 
 int is_operator(int c){
   return ((c == '=') || (c == ',') || (c == '{') || (c == '}') ||
-      (c == '[') || (c == ']') || (c == '(') || (c == ')') || (c == '!') || (c == ':'));
+      (c == '[') || (c == ']') || (c == '(') ||
+	  (c == ')') || (c == '!') || (c == ':') || (c == '|'));
 }
 
 // straight from Gravity
 void lexer_scan_number(struct lexer *lexer) {
 	printf("Scanning number\n");
     int			c;
-    int			minusSign = '-';
 
     TKN_RESET;
 
     loop:
-    c = PEEK_CURRENT;
+    c = PEEK(0);
 
-    // explicitly list all accepted cases
-    if (IS_EOF) goto report_token;
-    if (is_digit(c, ntype)) goto accept_char;
-    if (is_whitespace(c)) goto report_token;
-    if (is_newline(lexer, c)) goto report_token;
+	    // explicitly list all accepted cases
+	    if (IS_EOF) goto report_token;
+	    if (is_digit(c)) goto accept_char;
+	    if (is_whitespace(c)) goto report_token;
+	    if (is_newline(lexer, c)) goto report_token;
 
-    if (floatAllowed) {
-        if ((c == floatChar) && (!is_digit(PEEK_NEXT, ntype))) {
-            goto report_token;
-        }
-        if ((c == floatChar) && (!dotFound))  {
-            dotFound = true;
-            goto accept_char;
-        }
-    }
-    if (signAllowed) {
-        if (c == minusSign) {
-            signAllowed = false;
-            goto accept_char;
-        }
-    }
-    if (is_operator(c)) {
-        goto report_token;
-    }
+	    if (is_operator(c)) {
+	        goto report_token;
+	    }
 
     // any other case is an error
     goto report_error;
@@ -234,7 +235,7 @@ struct token lexer_next(struct lexer* lexer){
 	int c;
 	struct token token;
 	while (1) {
-		if (IS_EOF) { return TOK_EOF; }
+		if (IS_EOF) { return TKN_EOF; }
     	c = PEEK(0);
 		if (is_whitespace(c)){
 			ADD_OFFSET_POSITION(1);
@@ -249,7 +250,7 @@ struct token lexer_next(struct lexer* lexer){
 		} else if (is_string(c)){
 			return lexer_scan_string(lexer);
 		} else {
-			return lexer_error(lexer, "Unrecognised token.");
+			lexer_error(lexer, "Unrecognised token.");
 		}
 	}
 	return token;

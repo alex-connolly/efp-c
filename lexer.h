@@ -6,6 +6,7 @@
 #include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 
 // lexer adapted from the Gravity lexer, will rewrite when I have time
 
@@ -18,10 +19,13 @@ struct lexer {
     uint32_t column;
 
     struct token token;		    // current token
-    bool peeking;		// flag to check if a peek operation is in progress
 };
 
+struct token lexer_next(struct lexer* lexer);
 struct lexer* lexer_create(const char* src, size_t len);
 void lexer_free(struct lexer* lexer);
+
+int token_int(struct lexer* lexer, struct token token);
+char* token_string(struct lexer* lexer, struct token token);
 
 #endif

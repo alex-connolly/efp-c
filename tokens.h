@@ -20,7 +20,7 @@ enum token_type {
 struct token {
     enum token_type		type;
     uint32_t			line;
-    uint32_t			col;
+    uint32_t			column;
     uint32_t			position;
     uint32_t			start;
     uint32_t            end;
@@ -28,8 +28,6 @@ struct token {
     bool				escaped;
 };
 
-
-const char* token_string (struct token token, uint32_t *len);
 enum token_type token_keyword (const char *buffer, int32_t len);
 char* token_as_string(enum token_type type);
 

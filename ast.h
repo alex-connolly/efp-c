@@ -18,14 +18,18 @@ struct element {
     struct element** elements;
 };
 
+union value {
+    int number;
+    float decimal;
+    char* string;
+    char* identifier;
+};
+
 struct field_value {
+    int is_array;               // should only be used in prototype tree
     enum token_type type;
-    union value {
-        int number;
-        float decimal;
-        char* string;
-        char* identifier;
-    } value;
+    union value value;
+    union value def;
     int min, max;                // for array sizes
 };
 
@@ -37,7 +41,7 @@ struct field {
 
 struct element* create_element(struct element* parent, char* key);
 void create_field(struct element* parent, char* key);
-void add_field_value(struct field* field, struct field_value, enum token_type t);
+void add_field_value(struct field* field, struct field_value* value);
 
 struct field* element_field(struct element* e, const char* key);
 struct element* element_element(struct element* e, const char* key);

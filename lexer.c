@@ -6,7 +6,7 @@
 #define RESET_COL lexer->column = 0
 #define IS_EOF (lexer->offset >= lexer->length)
 #define OFFSET_ADD(n) lexer->offset += n;
-#define INC_OFFSET_POSITION(n) OFFSET_ADD(n); POS_ADD(n)
+#define ADD_OFFSET_POSITION(n) OFFSET_ADD(n); POS_ADD(n)
 #define PEEK(n) ((lexer->offset < lexer->length + 1) ? lexer->buffer[lexer->offset+n] : 0)
 #define NEXT(n) lexer->buffer[lexer->offset+=n]; POS_ADD(n); COL_ADD(n);
 
@@ -68,8 +68,11 @@ int lexer_error(struct lexer* lexer, char* error){
     return -1;
 }
 
-struct lexer* lexer_create(const char* src, size_t len){
+struct lexer* lexer_create(const char* file_name){
     struct lexer* lexer = malloc(sizeof(struct lexer));
+
+	FILE* f = fopen(file_name, "r");
+
 	lexer->buffer = src;
 	lexer->offset = 0;
 	lexer->line = 0;
@@ -100,7 +103,7 @@ static inline int next_utf8(struct lexer* lexer) {
     return c;
 }
 
-void lexer_scan_string(struct lexer* lexer) {
+struct token lexer_scan_string(struct lexer* lexer) {
 	printf("Scanning string\n");
     int c, c2;
 
@@ -115,7 +118,7 @@ void lexer_scan_string(struct lexer* lexer) {
 
     while ((c2 = (unsigned char)PEEK(0)) != c) {
         if (IS_EOF) {lexer_error(lexer, "Unexpected EOF inside a string literal");}
-        if (is_newline(lexer, c2)) LINE_ADD(1);
+        if (is_newline(c2)) LINE_ADD(1);
 
         // handle escaped characters
         if (c2 == '\\') {
@@ -136,6 +139,7 @@ void lexer_scan_string(struct lexer* lexer) {
     lexer->token.type = TKN_STRING;
 	printf("Found string: %.*s\n", lexer->token.end - lexer->token.start,
 		lexer->buffer + lexer->token.start);
+	return lexer->token;
 }
 
 int is_operator(int c){
@@ -145,7 +149,7 @@ int is_operator(int c){
 }
 
 // straight from Gravity
-void lexer_scan_number(struct lexer *lexer) {
+struct token lexer_scan_number(struct lexer *lexer) {
 	printf("Scanning number\n");
     int			c;
 
@@ -156,9 +160,9 @@ void lexer_scan_number(struct lexer *lexer) {
 
 	    // explicitly list all accepted cases
 	    if (IS_EOF) goto report_token;
-	    if (is_digit(c)) goto accept_char;
+	    if (isdigit(c)) goto accept_char;
 	    if (is_whitespace(c)) goto report_token;
-	    if (is_newline(lexer, c)) goto report_token;
+	    if (is_newline(c)) goto report_token;
 
 	    if (is_operator(c)) {
 	        goto report_token;
@@ -169,13 +173,13 @@ void lexer_scan_number(struct lexer *lexer) {
 
     accept_char:
         lexer->token.end++;
-        INC_OFFSET_POSITION;
+        ADD_OFFSET_POSITION(1);
         goto loop;
 
     report_token:
         // number is from buffer->[nseek] and it is bytes length
         lexer->token.type = TKN_NUMBER;
-		return;
+		return lexer->token;
 
         //return TKN_NUMBER;
 
@@ -183,9 +187,9 @@ void lexer_scan_number(struct lexer *lexer) {
         lexer_error(lexer, "Malformed number expression.");
 }
 
-void lexer_scan_operator(struct lexer* lexer){
+struct token lexer_scan_operator(struct lexer* lexer){
 	printf("Scanning operator\n");
-  	int c = PEEK_CURRENT(0);
+  	int c = lexer_peek(lexer, 1);
 	// current only handles one character oprators
 	printf("Found operator: %c\n", c);
 	switch (c) {
@@ -214,9 +218,10 @@ void lexer_scan_operator(struct lexer* lexer){
   	default:
 		lexer->token.type = TKN_ERROR;
 	}
+	return lexer->token;
 }
 
-void lexer_scan_identifier(struct lexer* lexer) {
+struct token lexer_scan_identifier(struct lexer* lexer) {
 	printf("scanning identifier\n");
     TKN_RESET;
 
@@ -225,19 +230,23 @@ void lexer_scan_identifier(struct lexer* lexer) {
 
     while (is_identifier(PEEK(0))) {
         OFFSET_ADD(1);
-		COLUMN_ADD(1);
+		COL_ADD(1);
     	lexer->token.end++;
     }
     SET_TKNTYPE(TKN_IDENTIFIER);
 	printf("Found identifier: %.*s\n", lexer->token.end - lexer->token.start,
 		lexer->buffer + lexer->token.start);
+	return lexer->token;
 }
 
 struct token lexer_next(struct lexer* lexer){
 	int c;
 	struct token token;
 	while (1) {
-		if (IS_EOF) { return TKN_EOF; }
+		if (IS_EOF) {
+			token.type = TKN_EOF;
+			return token;
+		}
     	c = PEEK(0);
 		if (is_whitespace(c)){
 			ADD_OFFSET_POSITION(1);
@@ -256,4 +265,8 @@ struct token lexer_next(struct lexer* lexer){
 		}
 	}
 	return token;
+}
+
+enum token_type lexer_peek(struct lexer* lexer, int ahead){
+
 }

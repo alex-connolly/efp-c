@@ -1,16 +1,15 @@
 #include "parser.h"
-#include <string.h>
 
-void parse_statement(struct element* scope, struct parser* parser);
-void parse_element_declaration(struct element* scope, struct parser* parser);
-void parse_field_assignment(struct element* scope, struct parser* parser);
+void parse_statement(struct parser* parser, struct element* prototype, struct element* scope);
+void parse_element_declaration(struct parser* parser, struct element* prototype, struct element* scope);
+void parse_field_assignment(struct parser* parser, struct element* prototype, struct element* scope);
 void prototype_parse_element(struct parser* parser, struct element* prototype);
 void prototype_parse_field(struct parser* parser, struct element* prototype);
 void prototype_parse_statement(struct parser* parser, struct element* prototype);
 void parser_error(struct parser* parser, char* error);
 
 #define LEXER_NEXT lexer_next(parser->lexer)
-#define LEXER_NEXT_ENFORCE(type) struct token t = lexer_next(parser->lexer); if (t.type != type) {parser_error(parser, "Failed to enforce token\n"); }
+#define LEXER_NEXT_ENFORCE(tkn) if ((token = lexer_next(parser->lexer)).type != tkn) {parser_error(parser, "Failed to enforce token\n"); }
 
 void parser_error(struct parser* parser, char* error){
 
@@ -44,36 +43,44 @@ void prototype_parse_array(struct parser* parser, struct field* field){
     struct token token  = LEXER_NEXT;
     switch(token.type){
         case TKN_NUMBER:
-            value.min = token_int(lexer, token);
+            value.min = token_int(parser->lexer, token);
 
             LEXER_NEXT_ENFORCE(TKN_COLON);
 
             LEXER_NEXT_ENFORCE(TKN_IDENTIFIER);
 
-            token = LEXER_NEXT
+            token = LEXER_NEXT;
             switch(token.type){
                 case TKN_COLON:
-                    token = LEXER_NEXT_ENFORCE(TKN_NUMBER);
-                    field.max = token.value.number;
+                    LEXER_NEXT_ENFORCE(TKN_NUMBER);
+                    value.max = token_int(parser->lexer, token);
                     return;
                 case TKN_CLOSE_SQUARE:
                     return;
+                default:
+                    break;
             }
             break;
         case TKN_IDENTIFIER:
-            field->value->identifier = token.value.identifer;
-            token = LEXER_NEXT
+            value.value.identifier = token_string(parser->lexer, token);
+            token = LEXER_NEXT;
             switch(token.type){
                 case TKN_COLON:
-                    token = LEXER_NEXT_ENFORCE(TKN_NUMBER);
-                    field->max = token.value.number;
+                    token = LEXER_NEXT;
+                    value.max = token_int(parser->lexer, token);
                     LEXER_NEXT_ENFORCE(TKN_CLOSE_SQUARE);
                     return;
                 case TKN_CLOSE_SQUARE:
                     return;
+                default:
+                    break;
             }
             break;
+        default:
+            break;
     }
+    value.is_array = 1; // true
+    add_field_value(field, value);
 }
 
 void prototype_parse_field(struct parser* parser, struct element* prototype){
@@ -86,12 +93,13 @@ void prototype_parse_field(struct parser* parser, struct element* prototype){
 
     parse_type:
 
+    struct field_value fvalue;
+
     token = LEXER_NEXT;
     switch(token.type){
         case TKN_IDENTIFIER:
-            struct field_value value;
-            value->value->string = token_string(parser->lexer, token)
-            add_field_value(field, &value);
+            fvalue.value.string = token_string(parser->lexer, token);
+            add_field_value(field, &fvalue);
             break;
         case TKN_OPEN_SQUARE:
             prototype_parse_array(parser, field);
@@ -106,34 +114,37 @@ void prototype_parse_field(struct parser* parser, struct element* prototype){
             token = LEXER_NEXT;
             switch(token.type){
                 case TKN_NUMBER:
-                    field->default->number = token_int(parser->lexer, token);
+                    fvalue.def.number = token_int(parser->lexer, token);
                     break;
                 case TKN_IDENTIFIER:
-                    field->default->identifer = token_string(parser->lexer, token);
+                    fvalue.def.identifer = token_string(parser->lexer, token);
                     break;
                 case TKN_STRING:
-                    field->default->string = token_string(parser->lexer, token);
+                    fvalue.def.string = token_string(parser->lexer, token);
                     break;
+                default: break;
             }
             LEXER_NEXT_ENFORCE(TKN_CLOSE_BRACKET)
             break;
         case TKN_DIVIDER:
             goto parse_type;
             break;
-
+        default: break;
+    }
 }
 
 void prototype_parse_statement(struct parser* parser, struct element* prototype){
-    if (LEXER_PEEK == TKN_CLOSE_BRACE){
+
+    if (lexer_peek(parser->lexer, 0) == TKN_CLOSE_BRACE){
         LEXER_NEXT;
-        parse_statement(lexer, prototype->parent);
+        prototype_parse_statement(parser, prototype->parent);
     }
-    switch(LEXER_DOUBLE_PEEK){
+    switch(lexer_peek(parser->lexer, 1)){
         case TKN_OPEN_BRACE:
-            prototype_parse_element(lexer, prototype);
+            prototype_parse_element(parser, prototype);
             break;
-        case TKN_OPEN_BRACE:
-            prototype_parse_field(lexer, prototype);
+        case TKN_COLON:
+            prototype_parse_field(parser, prototype);
             break;
         default:
             return;
@@ -147,6 +158,10 @@ void prototype_create(struct parser* parser){
 
 void free_element(struct element* element){
     for (int i = 0; i < element->num_fields; i++){
+        free(element->fields[i]->key);
+        for (int j = 0; j < element->fields[i]->num_values; j++){
+            free(element->fields[i]->values[j]);
+        }
         free(element->fields[i]);
     }
     for (int i = 0; i < element->num_elements; i++){
@@ -155,107 +170,105 @@ void free_element(struct element* element){
     free(element);
 }
 
-
 void prototype_free(struct element* prototype){
     free_element(prototype);
 }
 
 struct parser* parser_create(char* prototype_file){
-    FILE* p = fopen(prototype_file, "r");
-
     struct parser* p = malloc(sizeof(struct parser));
-    struct lexer* l = lexer_create(src, len);
-    p->offset = 0;
+    struct lexer* l = lexer_create(prototype_file);
     p->lexer = l;
-    prototype_create(parser);
+    prototype_create(p);
     return p;
 }
 
-void parse_field_assignment(struct element* prototype, struct element* scope, struct parser* parser){
+void parse_field_assignment(struct parser* parser, struct element* prototype, struct element* scope){
     struct field* field = malloc(sizeof(struct field));
-    struct token token = parser->tokens[parser->offset++];
 
-    char* key = malloc((token.end - token.start + 1)*(sizeof(char)));
-    strncpy(key, parser->lexer->buffer + token.start, token.end - token.start);
-    key[token.end - token.start] = '\0';
+    struct token token = LEXER_NEXT;
+
+    char* key = token_string(parser->lexer, token);
+
+    create_field(scope, key);
 
     printf("field (%d) has key %s\n", token.type, key);
 
     // process =
-    parser->offset++;
+    LEXER_NEXT;
 
-    token = parser->tokens[parser->offset++];
+    token = LEXER_NEXT;
 
     char* value = token_string(parser->lexer, token);
 
     printf("field extends from %d to %d\n", token.start, token.end);
     printf("field (%d) has value %s \n", token.type, value);
 
-    union field_value val;
-    val.identifier = value;
-    create_field(scope, key, val, parser->tokens[parser->offset].type);
+    struct field_value val;
+    val.value.identifier = value;
 
-    if (parser->tokens[parser->offset].type == TKN_COMMA){
-        parser->offset++;
+    add_field_value(field, &val);
+    if (token.type == TKN_COMMA){
+        LEXER_NEXT;
     }
-    parse_statement(scope, parser);
+    parse_statement(parser, prototype, scope);
 }
 
-void parse_element_declaration(struct element* prototype, struct element* scope, struct parser* parser){
+void parse_element_declaration(struct parser* parser, struct element* prototype, struct element* scope){
 
     struct token token = LEXER_NEXT;
 
-    // process {
-    parser->offset++;
-    char* value = malloc((token.end - token.start + 1)*(sizeof(char)));
-    strncpy(value, parser->lexer->buffer + token.start, token.end - token.start);
-    value[token.end - token.start] = '\0';
+    char* key = token_string(lexer, token);
 
-    if (element_element(prototype, value) == NULL){
-        parse_error("Line %d: \nInvalid key '%s' in element '%s'", parser->lexer->line, )
+    // process {
+    LEXER_NEXT;
+
+    if (element_element(prototype, key) == NULL){
+        //parse_error("Line %d: \nInvalid key '%s' in element '%s'", parser->lexer->line, )
     } else {
-        prototype = element_element(prototype, value);
+        prototype = element_element(prototype, key);
     }
 
-    printf("Parsing element declaration with key %s\n", value);
+    printf("Parsing element declaration with key %s\n", key);
 
-    struct element* element = create_element(scope, value);
-    parse_statement(prototype, element, parser);
+    struct element* element = create_element(scope, key);
+    parse_statement(parser, prototype, element);
 }
 
-void parse_statement(struct element* prototype, struct element* scope, struct parser* parser){
-    printf("Parsing statement with offset %d ...\n", parser->offset);
-    if (parser->tokens[parser->offset].type == TKN_CLOSE_BRACE){
-        parser->offset++;
-        parse_statement(scope->parent, parser);
+void parse_statement(struct parser* parser, struct element* prototype, struct element* scope){
+    struct token token = LEXER_NEXT;
+    //printf("Parsing statement with offset %d ...\n", parser->offset);
+    if (token.type == TKN_CLOSE_BRACE){
+        LEXER_NEXT;
+        parse_statement(parser, prototype->parent, scope->parent);
     }
     // we are interested in the second token in all .fire declarations
     // <key> {
     // <key> = <value>
-    enum token_type type = parser->tokens[parser->offset + 1].type;
-    switch (type){
+    switch (token.type){
         case TKN_ASSIGN:
             printf("Parsing field declaration...\n");
-            parse_field_assignment(scope, parser);
+            parse_field_assignment(parser, prototype, scope);
             break;
         case TKN_OPEN_BRACE:
             printf("Parsing element...\n");
-            parse_element_declaration(scope, parser);
+            parse_element_declaration(parser, prototype, scope);
             break;
         default:
-            printf("what is this (%d)\n", parser->tokens[parser->offset + 1].type);
+            //printf("what is this (%d)\n", parser->tokens[parser->offset + 1].type);
             printf("should be (%d)\n", TKN_OPEN_BRACE);
             break;
     }
 }
 
-struct element* parser_run(struct parser* parser){
+struct element* parser_run(struct parser* parser, char* file_name){
+
+    parser->lexer = lexer_create(file_name);
     struct element* scope = malloc(sizeof(struct element));
     scope->fields = NULL;
     scope->elements = NULL;
     scope->num_fields = 0;
     scope->num_elements = 0;
-    parse_statement(scope, parser);
+    parse_statement(parser, parser->prototype, scope);
     scope = element_element(scope, "fireVM");
     return scope;
 }

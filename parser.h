@@ -1,10 +1,12 @@
 #ifndef EFP_PARSER_H
 #define EFP_PARSER_H
 
+#include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include "ast.h"
 #include "lexer.h"
+#include "tokens.h"
 
 struct parser {
     char* prototype_file;

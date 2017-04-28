@@ -1,30 +1,26 @@
 #include "ast.h"
 
-void add_element(struct element* scope, struct element* element){
-    if (scope->num_elements == 0){
-        scope->elements = calloc(1, sizeof(struct element*));
-    } else if (is_power_of_two(scope->num_elements)){
-        scope->elements = calloc(scope->num_elements * 2, sizeof(struct element*));
+void resize_for_add(void* array, size_t size, size_t element_size){
+    if (size == 0){
+        array = calloc(1, element_size);
+    } else if (is_power_of_two(size)){
+        array = calloc(size * 2, element_size);
     }
+}
+
+void add_element(struct element* scope, struct element* element){
+    resize_for_add(scope->elements, scope->num_elements, sizeof(struct element*));
     scope->elements[scope->num_elements++] = element;
     element->parent = scope;
 }
 
 void add_field(struct element* scope, struct field* field){
-    if (scope->num_fields == 0){
-        scope->fields = calloc(1, sizeof(struct field*));
-    } else if (is_power_of_two(scope->num_fields)){
-        scope->fields = calloc(scope->num_fields * 2, sizeof(struct field*));
-    }
+    resize_for_add(scope->fields, scope->num_fields, sizeof(struct field*));
     scope->fields[scope->num_fields++] = field;
 }
 
 void add_field_value(struct field* field, struct field_value* value){
-    if (field->num_values == 0){
-        field->values = calloc(1, sizeof(struct field_value*));
-    } else if (is_power_of_two(field->num_values)){
-        field->values = calloc(field->num_values * 2, sizeof(struct field_value*));
-    }
+    resize_for_add(field->values, field->num_values, sizeof(struct field_value*));
     field->values[field->num_values++] = value;
 }
 

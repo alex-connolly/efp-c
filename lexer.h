@@ -21,8 +21,9 @@ struct lexer {
     struct token token;		    // current token
 };
 
+enum token_type lexer_peek(struct lexer* lexer, int ahead);
 struct token lexer_next(struct lexer* lexer);
-struct lexer* lexer_create(const char* src, size_t len);
+struct lexer* lexer_create(const char* filename);
 void lexer_free(struct lexer* lexer);
 
 int token_int(struct lexer* lexer, struct token token);

@@ -2,5 +2,5 @@ arrays {
     min : [2:string]
     max : [string:2]
     fixed : [2:string:2]
-    either : ([2:string:2]|[3:int]|[id:4])(["default", "text"])
+    either : [2:string:2]|[3:int]|[id:4](["default", "text"])
 }

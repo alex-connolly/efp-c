@@ -14,7 +14,7 @@ enum token_type {
     TKN_OPEN_BRACKET, TKN_CLOSE_BRACKET,
     TKN_OPEN_SQUARE, TKN_CLOSE_SQUARE,
     TKN_OPEN_BRACE, TKN_CLOSE_BRACE, TKN_COMMA,
-    TKN_COLON, TKN_EXCLAMATION, TKN_OR
+    TKN_COLON, TKN_EXCLAMATION, TKN_DIVIDER
 };
 
 struct token {
@@ -27,10 +27,6 @@ struct token {
     uint32_t			fileid;
     bool				escaped;
 };
-
-enum token_type token_keyword (const char *buffer, int32_t len);
-char* token_as_string(enum token_type type);
-
 
 #define NO_TOKEN				(struct token){0,0,0,0,0,0,0,0}
 

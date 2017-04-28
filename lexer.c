@@ -16,7 +16,7 @@
 #define SET_TKNESCAPED(value)	lexer->token.escaped = value
 #define SET_TKNTYPE(t)			lexer->token.type = t
 
-static inline bool is_newline(struct lexer* lexer, int c){
+static inline bool is_newline(int c){
     // many more cases
     return (c == '\n');
 }
@@ -26,7 +26,7 @@ int token_int(struct lexer* lexer, struct token token){
 	char* value = malloc((token.end - token.start + 1)*(sizeof(char)));
     strncpy(value, lexer->buffer + token.start, token.end - token.start);
     value[token.end - token.start] = '\0';
-	int x = atoi(value);
+	int x = atoi(value); // guaranteed to be int
 	free(value);
 	return x;
 }
@@ -39,7 +39,7 @@ char* token_string(struct lexer* lexer, struct token token){
 }
 
 static inline bool is_identifier (int c) {
-    return ((isalpha(c)) || (isdigit(c)) || (c == '_') || (c == '(') || (c == ')'));
+    return ((isalpha(c)) || (isdigit(c)) || (c == '_'));
 }
 
 static inline bool is_alpha (int c) {
@@ -190,7 +190,7 @@ void lexer_scan_operator(struct lexer* lexer){
 	printf("Found operator: %c\n", c);
 	switch (c) {
 	case '=':
-		lexer->token.type = TKN_ASSIGN;break;
+		lexer->token.type = TKN_ASSIGN; break;
 	case ',':
 	  	lexer->token.type = TKN_COMMA;break;
 	case '{':
@@ -209,6 +209,8 @@ void lexer_scan_operator(struct lexer* lexer){
 		lexer->token.type = TKN_EXCLAMATION; break;
 	case ':':
 		lexer->token.type = TKN_COLON; break;
+	case '|':
+		lexer->token.type = TKN_DIVIDER; break;
   	default:
 		lexer->token.type = TKN_ERROR;
 	}

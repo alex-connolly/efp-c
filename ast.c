@@ -19,6 +19,15 @@ void add_field(struct element* scope, struct field* field){
     scope->fields[scope->num_fields++] = field;
 }
 
+void add_field_value(struct field* field, struct field_value* value){
+    if (field->num_values == 0){
+        field->values = calloc(1, sizeof(struct field_value*));
+    } else if (is_power_of_two(field->num_values)){
+        field->values = calloc(field->num_values * 2, sizeof(struct field_value*));
+    }
+    field->values[field->num_values++] = value;
+}
+
 struct element* create_element(struct element* parent, char* key){
     struct element* element = malloc(sizeof(struct element)); // will leak
     element->key = key;
@@ -30,11 +39,9 @@ struct element* create_element(struct element* parent, char* key){
     return element;
 }
 
-void create_field(struct element* parent, char* key, enum token_type t, union field_value* value){
+void create_field(struct element* parent, char* key){
     struct field* field = malloc(sizeof(struct field));
     field->key = key;
-    field->value = value;
-    field->type = t;
     add_field(parent, field);
 }
 

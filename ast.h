@@ -18,22 +18,26 @@ struct element {
     struct element** elements;
 };
 
-union field_value {
-    int number;
-    float decimal;
-    char* string;
-    char* identifier;
+struct field_value {
+    enum token_type type;
+    union value {
+        int number;
+        float decimal;
+        char* string;
+        char* identifier;
+    } value;
+    int min, max;                // for array sizes
 };
 
 struct field {
     char* key;
-    union field_value* value;
-    enum token_type type;
-    int max, min;                   // for array sizes
+    int num_values;
+    struct field_value** values;
 };
 
 struct element* create_element(struct element* parent, char* key);
-void create_field(struct element* parent, char* key, enum token_type t, union field_value* value);
+void create_field(struct element* parent, char* key);
+void add_field_value(struct field* field, struct field_value, enum token_type t);
 
 struct field* element_field(struct element* e, const char* key);
 struct element* element_element(struct element* e, const char* key);

@@ -10,7 +10,7 @@ void prototype_parse_statement(struct parser* parser, struct element* prototype)
 void parser_error(struct parser* parser, char* error);
 
 #define LEXER_NEXT lexer_next(parser->lexer)
-#define LEXER_NEXT_ENFORCE(type) struct token t lexer_next(parser->lexer); if (t.type != type) parser_error(parser, "Failed to enforce token\n");
+#define LEXER_NEXT_ENFORCE(type) struct token t = lexer_next(parser->lexer); if (t.type != type) {parser_error(parser, "Failed to enforce token\n"); }
 
 void parser_error(struct parser* parser, char* error){
 
@@ -33,17 +33,18 @@ void prototype_parse_element(struct parser* parser, struct element* prototype){
 
 void prototype_parse_array(struct parser* parser, struct field* field){
 
+    struct field_value value;
+
     // possible array forms
     // [string], [2:string], [string:2], [2:string:2]
 
-    // first token is always '['
-    LEXER_NEXT_ENFORCE(TKN_OPEN_SQUARE);
+    // we have already parsed '['
 
     // first possible number
-    struct token = LEXER_NEXT;
+    struct token token  = LEXER_NEXT;
     switch(token.type){
         case TKN_NUMBER:
-            field.min = token.value.number;
+            value.min = token_int(lexer, token);
 
             LEXER_NEXT_ENFORCE(TKN_COLON);
 
@@ -58,7 +59,6 @@ void prototype_parse_array(struct parser* parser, struct field* field){
                 case TKN_CLOSE_SQUARE:
                     return;
             }
-
             break;
         case TKN_IDENTIFIER:
             field->value->identifier = token.value.identifer;
@@ -80,26 +80,47 @@ void prototype_parse_field(struct parser* parser, struct element* prototype){
     struct field* field = malloc(sizeof(struct element));
     // get the key
     struct token token = LEXER_NEXT;
-    field->key = token->value->identifier;
+    field->key = token_string(parser->lexer, token);
 
     LEXER_NEXT_ENFORCE(TKN_COLON);
 
-    LEXER_NEXT
-    switch(LEXER_TOKEN_TYPE){
-        case TKN_IDENTIFIER:
-            field->value->identifer = LEXER_TOKEN_VALUE
-            switch(LEXER_PEEK){
-                case TKN_OPEN_BRACKET:
-                    LEXER_NEXT;
-                    break;
-                default
-            }
-            break;
-        case OPEN_BRACKET:
+    parse_type:
 
+    token = LEXER_NEXT;
+    switch(token.type){
+        case TKN_IDENTIFIER:
+            struct field_value value;
+            value->value->string = token_string(parser->lexer, token)
+            add_field_value(field, &value);
+            break;
+        case TKN_OPEN_SQUARE:
+            prototype_parse_array(parser, field);
+            break;
+        default:
             break;
     }
-    field->value->identifier =
+
+    token = LEXER_NEXT;
+    switch (token.type){
+        case TKN_OPEN_BRACKET:
+            token = LEXER_NEXT;
+            switch(token.type){
+                case TKN_NUMBER:
+                    field->default->number = token_int(parser->lexer, token);
+                    break;
+                case TKN_IDENTIFIER:
+                    field->default->identifer = token_string(parser->lexer, token);
+                    break;
+                case TKN_STRING:
+                    field->default->string = token_string(parser->lexer, token);
+                    break;
+            }
+            LEXER_NEXT_ENFORCE(TKN_CLOSE_BRACKET)
+            break;
+        case TKN_DIVIDER:
+            goto parse_type;
+            break;
+
 }
 
 void prototype_parse_statement(struct parser* parser, struct element* prototype){
